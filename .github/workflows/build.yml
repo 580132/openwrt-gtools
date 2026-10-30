@@ -49,11 +49,11 @@ jobs:
           cd sdk
           echo "--- feeds.conf.default ---"
           cat feeds.conf.default
-          # The SDK may ship a 'base' feed that points at a newer tree than the
-          # bundled base packages. Drop it and use the base packages shipped
-          # with the SDK, whose source tarballs match the 25.12 release.
-          grep -vE '^[[:space:]]*src-(git|link)[[:space:]]+base([[:space:];]|$)' \
-            feeds.conf.default > feeds.conf || true
+          # The SDK ships a 'base' feed (with --root=package) that can point at
+          # a tree whose source tarballs are not on the mirror. Drop it and use
+          # the base packages bundled with the SDK instead.
+          sed -E '/^[[:space:]]*src-(git|link).*[[:space:]]base([[:space:];]|$)/d' \
+            feeds.conf.default > feeds.conf
           echo "--- feeds.conf ---"
           cat feeds.conf
           ./scripts/feeds update -a
@@ -74,7 +74,9 @@ jobs:
             [ -n "$version" ] || version="1.0.0"
           fi
           make package/luci-app-gtools/compile V=s -j"$(nproc)" \
-            PKG_VERSION="$version" PKG_RELEASE=1
+            PKG_VERSION="$version" PKG_RELEASE=1 \
+            LUCI_DEPENDS= PKG_BUILD_DEPENDS= \
+            LUCI_MINIFY_JS=0 LUCI_MINIFY_CSS=0
 
       - name: Collect artifacts
         run: |
