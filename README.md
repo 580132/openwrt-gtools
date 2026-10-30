@@ -120,6 +120,8 @@ honk 目前只有 beta 版本，因此默认 `auto` 会选中最新的 beta。�
 
 1. 读取 `/usr/share/gtools/cores.json` 中注册的核心。
 2. 请求 `https://api.github.com/repos/<repo>/releases?per_page=100`。
+   API 不可用（限流、被墙）时自动改用 `releases.atom` 和
+   `releases/expanded_assets/<tag>` 页面，不消耗 API 限额。
 3. 按更新通道挑选最新 release。
 4. 根据架构、变体、分配器拼出资源名，并与 release 的 assets 列表核对。
 5. 下载资源到 `/tmp/gtools/`。
@@ -350,7 +352,10 @@ honk 上游只提供 `x86_64` 和 `aarch64`。其它架构请使用固件自带�
 - 或配置 GitHub Token；
 - 检查路由器的 DNS、时间和代理设置。
 
-未认证的 GitHub API 限额是每小时 60 次；正常手动检查不会触发，频繁刷新时建议配置 Token。
+未认证的 GitHub API 限额是每小时 60 次（按出口 IP 计算）。GTools 在 API
+返回 403/限流时会自动改用 Releases 页面（`releases.atom` +
+`releases/expanded_assets`）继续检查，因此即使限额耗尽也能看到最新版本；
+配置 Token 可以让检查更快、更稳定。
 
 ### 升级后服务未启动
 

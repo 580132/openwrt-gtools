@@ -318,6 +318,73 @@ backup_current() {
 	return 0
 }
 
+fallback_check() {
+	local _core=$1
+	local _repo=$2
+	local _channel=$3
+	local _variant=$4
+	local _allocator=$5
+	local _arch=$6
+	local _out=$7
+	local _atom="$RUN_DIR/releases.$_core.atom"
+	local _tags="$RUN_DIR/releases.$_core.tags"
+	local _html="$RUN_DIR/assets.$_core.html"
+	local _rel="$RUN_DIR/releases.$_core.alt.json"
+	local _tag
+	local _published
+	local _pre
+	local _msg
+
+	if ! fetch "https://github.com/$_repo/releases.atom" "$_atom"; then
+		printf 'error\t无法访问 GitHub API，也无法访问 Releases 页面\nchecked\t%s\n' \
+			"$(date +%s)" > "$_out"
+		return 1
+	fi
+
+	if ! ucode "$DATA_DIR/feed.uc" "$_core" "$_channel" "$_atom" > "$_tags" 2>/dev/null; then
+		rm -f "$_atom" "$_tags"
+		printf 'error\t无法解析 Releases 列表\nchecked\t%s\n' "$(date +%s)" > "$_out"
+		return 1
+	fi
+
+	if [ ! -s "$_tags" ]; then
+		case "$_channel" in
+			stable) _msg='上游暂无稳定版' ;;
+			beta)   _msg='上游暂无测试版' ;;
+			debug)  _msg='上游暂无调试版' ;;
+			*)      _msg='上游暂无可用版本' ;;
+		esac
+
+		rm -f "$_atom" "$_tags"
+		printf 'error\t%s\nchecked\t%s\n' "$_msg" "$(date +%s)" > "$_out"
+		return 1
+	fi
+
+	while IFS="$(printf '\t')" read -r _tag _published _pre; do
+		[ -n "$_tag" ] || continue
+
+		if ! fetch "https://github.com/$_repo/releases/expanded_assets/$_tag" "$_html"; then
+			continue
+		fi
+
+		ucode "$DATA_DIR/assets.uc" "$_html" "$_tag" "$_published" "$_pre" > "$_rel" 2>/dev/null || continue
+
+		if ucode "$DATA_DIR/select.uc" "$_core" "$_channel" "$_variant" \
+			"$_allocator" "$_arch" "$_rel" > "$_out.try" 2>/dev/null; then
+			mv -f "$_out.try" "$_out"
+			rm -f "$_atom" "$_tags" "$_html" "$_rel"
+			return 0
+		fi
+
+		rm -f "$_out.try"
+	done < "$_tags"
+
+	rm -f "$_atom" "$_tags" "$_html" "$_rel"
+	printf 'error\tGitHub API 不可用（可能触发限流），备用检查也未找到可用版本；可设置 Token 后重试\nchecked\t%s\n' \
+		"$(date +%s)" > "$_out"
+	return 1
+}
+
 check_core() {
 	local _core=$1
 	local _arch
@@ -362,10 +429,19 @@ check_core() {
 	log "[$_core] 获取上游版本信息 ..."
 
 	if ! fetch "$(api_url "$_api")" "$_json" "$_token"; then
-		log "[$_core] 无法访问 GitHub API"
 		rm -f "$_json"
-		printf 'error\t无法访问 GitHub API，请检查网络、加速地址或 Token\nchecked\t%s\n' \
-			"$(date +%s)" > "$_out"
+		log "[$_core] GitHub API 不可用，改用 Releases 页面检查 ..."
+
+		if fallback_check "$_core" "$_repo" "$_channel" "$_variant" \
+			"$_allocator" "$_arch" "$_out"; then
+			_tag=$(tsv_get "$_out" tag)
+			_ver=$(tsv_get "$_out" version)
+			log "[$_core] 最新版本: ${_ver:-未知} (${_tag:-未知})"
+			return 0
+		fi
+
+		_err=$(tsv_get "$_out" error)
+		log "[$_core] 检查失败: ${_err:-未知错误}"
 		return 1
 	fi
 
