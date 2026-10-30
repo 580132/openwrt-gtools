@@ -144,6 +144,7 @@ return view.extend({
 			this.updateLog(this.logText);
 
 			window.setTimeout(function() { self.maybeAutoCheck(); }, 600);
+			this.bindPageActions();
 		}
 
 		poll.add(function() { return self.refresh(); }, 5);
@@ -590,6 +591,48 @@ return view.extend({
 
 	jobRunning: function() {
 		return !!(this.status && this.status.job && this.status.job.state == 'running');
+	},
+
+	bindPageActions: function() {
+		var self = this;
+		var tries = 0;
+
+		var attach = function() {
+			var bar = document.querySelector('.cbi-page-actions');
+
+			if (!bar) {
+				if (++tries < 20)
+					window.setTimeout(attach, 100);
+
+				return;
+			}
+
+			if (bar.getAttribute('data-gtools-bound'))
+				return;
+
+			bar.setAttribute('data-gtools-bound', '1');
+
+			/*
+			 * The theme renders its own "Save & Apply / Save / Reset" bar which
+			 * operates on LuCI's change tracking. GTools writes its settings
+			 * directly, so route those buttons to our save routine as well.
+			 */
+			bar.addEventListener('click', function(ev) {
+				/* Leave other LuCI pages alone. */
+				if (!document.querySelector('.gtools-settings'))
+					return;
+
+				ev.preventDefault();
+				ev.stopPropagation();
+
+				if (ev.target.closest && ev.target.closest('.cbi-button-reset'))
+					window.location.reload();
+				else
+					self.saveSettings();
+			}, true);
+		};
+
+		window.setTimeout(attach, 0);
 	},
 
 	maybeAutoCheck: function() {
