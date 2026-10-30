@@ -279,6 +279,12 @@ make package/luci-app-gtools/compile V=s -j$(nproc)
 find bin/packages -name 'luci-app-gtools-*.apk'
 ```
 
+> 如果本地构建遇到 `base` feed 源 404 或 `csstidy` 哈希不匹配，可参考
+> [`.github/workflows/build.yml`](.github/workflows/build.yml) 中的 `Prepare feeds`
+> 和 `make defconfig` 步骤：移除 SDK 的 `base` feed，并关闭
+> `LUCI_CSSTIDY` / `LUCI_JSMIN` / `LUCI_SRCDIET` / `LUCI_UTMIN`
+> 这几个 host 压缩工具（本包只包含文本文件，不需要它们）。
+
 ### 作为 feed 使用
 
 在 OpenWrt/ImmortalWrt 源码根目录的 `feeds.conf.default` 中加入：
