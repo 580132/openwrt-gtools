@@ -47,6 +47,15 @@ jobs:
         run: |
           set -euo pipefail
           cd sdk
+          echo "--- feeds.conf.default ---"
+          cat feeds.conf.default
+          # The SDK may ship a 'base' feed that points at a newer tree than the
+          # bundled base packages. Drop it and use the base packages shipped
+          # with the SDK, whose source tarballs match the 25.12 release.
+          grep -vE '^[[:space:]]*src-(git|link)[[:space:]]+base([[:space:];]|$)' \
+            feeds.conf.default > feeds.conf || true
+          echo "--- feeds.conf ---"
+          cat feeds.conf
           ./scripts/feeds update -a
           ./scripts/feeds install luci-base
 
