@@ -24,6 +24,40 @@ function readfile(path) {
 	}
 }
 
+function pkg_version(name) {
+	const files = [
+		'/lib/apk/db/installed',
+		'/usr/lib/apk/db/installed',
+		'/usr/lib/opkg/status',
+		'/var/lib/opkg/status'
+	];
+
+	for (let i = 0; i < length(files); i++) {
+		const lines = split(readfile(files[i]), '\n');
+		let in_pkg = false;
+
+		for (let j = 0; j < length(lines); j++) {
+			const line = trim(lines[j]);
+
+			if (in_pkg) {
+				/* apk uses "V:", opkg uses "Version: " */
+				if (substr(line, 0, 2) == 'V:')
+					return trim(substr(line, 2));
+
+				if (substr(line, 0, 9) == 'Version: ')
+					return trim(substr(line, 9));
+			}
+
+			if (line == 'P:' + name || line == 'Package: ' + name)
+				in_pkg = true;
+			else if (!length(line))
+				in_pkg = false;
+		}
+	}
+
+	return '';
+}
+
 function read_tsv(path) {
 	const result = {};
 	const lines = split(readfile(path), '\n');
@@ -330,6 +364,7 @@ printf('%J\n', {
 	time: time(),
 	arch: arch,
 	kernel: kernel,
+	version: pkg_version('luci-app-gtools'),
 	job: job,
 	settings: settings,
 	cores: cores

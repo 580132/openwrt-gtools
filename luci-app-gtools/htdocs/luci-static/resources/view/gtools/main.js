@@ -2,7 +2,6 @@
 'use strict';
 'require view';
 'require fs';
-'require uci';
 'require ui';
 'require poll';
 
@@ -110,7 +109,6 @@ function readLog() {
 return view.extend({
 	load: function() {
 		return Promise.all([
-			uci.load('gtools').catch(function() { return null; }),
 			execStatus().catch(function(err) {
 				return { error: err.message || String(err) };
 			}),
@@ -121,8 +119,8 @@ return view.extend({
 	render: function(data) {
 		var self = this;
 
-		this.status = data[1] || {};
-		this.logText = data[2] || '';
+		this.status = data[0] || {};
+		this.logText = data[1] || '';
 		this.lastJobState = this.status.job ? this.status.job.state : 'idle';
 		this.autoCheckDone = false;
 		this.form = { cores: {} };
@@ -187,7 +185,10 @@ return view.extend({
 				E('div', { 'class': 'gtools-toolbar' }, [
 					checkBtn,
 					E('span', { 'class': 'gtools-sub' },
-						_('架构：%s　内核：%s').format(this.status.arch || '?', this.status.kernel || '?'))
+						_('架构：%s　内核：%s　GTools：%s').format(
+							this.status.arch || '?',
+							this.status.kernel || '?',
+							this.status.version || '?'))
 				]),
 				E('div', { 'class': 'gtools-table-wrap' }, [
 					E('table', { 'class': 'table gtools-status' }, [
@@ -377,7 +378,9 @@ return view.extend({
 			E('button', {
 				'class': 'btn cbi-button cbi-button-apply',
 				'click': function(ev) { ev.preventDefault(); self.saveSettings(); }
-			}, _('保存设置'))
+			}, _('保存并应用')),
+			E('span', { 'class': 'gtools-sub' },
+				_('　修改后点击此按钮，立即写入配置并重新检查更新。'))
 		]));
 
 		return E('div', { 'class': 'gtools-settings' }, sections);
@@ -773,24 +776,26 @@ return view.extend({
 	saveSettings: function() {
 		var self = this;
 		var form = this.form;
+		var payload = { main: {} };
+		var main = payload.main;
 
-		uci.set('gtools', 'main', 'download_proxy', form.download_proxy.value.trim());
-		uci.set('gtools', 'main', 'api_proxy', form.api_proxy.value.trim());
+		main.download_proxy = form.download_proxy.value.trim();
+		main.api_proxy = form.api_proxy.value.trim();
 
 		if (form.clear_token.checked)
-			uci.set('gtools', 'main', 'api_token', '');
+			main.api_token = '';
 		else if (form.api_token.value.trim() != '')
-			uci.set('gtools', 'main', 'api_token', form.api_token.value.trim());
+			main.api_token = form.api_token.value.trim();
 
 		var keep = parseInt(form.keep_backups.value, 10);
 
 		if (!(keep >= 1 && keep <= 10))
 			keep = 3;
 
-		uci.set('gtools', 'main', 'keep_backups', String(keep));
-		uci.set('gtools', 'main', 'verify_sha256', form.verify_sha256.checked ? '1' : '0');
-		uci.set('gtools', 'main', 'auto_rollback', form.auto_rollback.checked ? '1' : '0');
-		uci.set('gtools', 'main', 'auto_check', form.auto_check.checked ? '1' : '0');
+		main.keep_backups = String(keep);
+		main.verify_sha256 = form.verify_sha256.checked ? '1' : '0';
+		main.auto_rollback = form.auto_rollback.checked ? '1' : '0';
+		main.auto_check = form.auto_check.checked ? '1' : '0';
 
 		for (var id in form.cores) {
 			if (!form.cores.hasOwnProperty(id))
@@ -798,17 +803,25 @@ return view.extend({
 
 			var core = form.cores[id];
 
-			uci.set('gtools', id, 'enabled', core.enabled.checked ? '1' : '0');
-			uci.set('gtools', id, 'channel', core.channel.value);
-			uci.set('gtools', id, 'variant', core.variant.value);
-			uci.set('gtools', id, 'allocator', core.allocator.value);
+			payload[id] = {
+				enabled: core.enabled.checked ? '1' : '0',
+				channel: core.channel.value,
+				variant: core.variant.value,
+				allocator: core.allocator.value
+			};
 		}
 
-		return uci.save().then(function() {
-			return uci.apply();
-		}).then(function() {
-			ui.addNotification(null, E('p', _('设置已保存')), 'info');
+		return fs.exec(SCRIPT, [ 'config', JSON.stringify(payload) ]).then(function(res) {
+			if (res.code != 0)
+				throw new Error((res.stderr || res.stdout || '').trim() || _('无法保存设置'));
+
+			ui.addNotification(null, E('p', _('设置已保存并应用')), 'info');
+
 			self.autoCheckDone = false;
+			self.form.api_token.value = '';
+
+			return self.refresh();
+		}).then(function() {
 			return self.checkUpdates(true);
 		}).catch(function(err) {
 			ui.addNotification(null,

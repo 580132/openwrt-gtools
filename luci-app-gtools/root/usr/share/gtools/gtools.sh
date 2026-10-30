@@ -939,12 +939,16 @@ case "${1:-}" in
 		[ -n "${2:-}" ] || { echo "usage: $0 restart <core>" >&2; exit 1; }
 		start_job restart "$2"
 		;;
+	config)
+		[ -n "${2:-}" ] || { echo "usage: $0 config <json>" >&2; exit 1; }
+		ucode "$DATA_DIR/save.uc" "$2" || exit 1
+		;;
 	_worker)
 		shift
 		_worker "$@"
 		;;
 	*)
-		echo "usage: $0 {status|check|upgrade|rollback|restart}" >&2
+		echo "usage: $0 {status|check|upgrade|rollback|restart|config}" >&2
 		exit 1
 		;;
 esac
