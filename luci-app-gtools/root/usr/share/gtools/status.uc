@@ -45,8 +45,48 @@ function read_tsv(path) {
 	return result;
 }
 
-function run(cmd) {
-	let proc = fs.popen(cmd);
+/*
+ * fs.popen() only accepts a command string. Passing an array makes it return
+ * null on some ucode builds, which would silently leave every field empty.
+ */
+function shquote(arg) {
+	arg = '' + arg;
+
+	let safe = length(arg) > 0;
+
+	for (let i = 0; i < length(arg); i++) {
+		const ch = substr(arg, i, 1);
+
+		if (index('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-', ch) < 0) {
+			safe = false;
+			break;
+		}
+	}
+
+	if (safe)
+		return arg;
+
+	let out = "'";
+
+	for (let i = 0; i < length(arg); i++) {
+		const ch = substr(arg, i, 1);
+
+		if (ch == "'")
+			out += "'\\''";
+		else
+			out += ch;
+	}
+
+	return out + "'";
+}
+
+function run(argv) {
+	const parts = [];
+
+	for (let i = 0; i < length(argv); i++)
+		push(parts, shquote(argv[i]));
+
+	let proc = fs.popen(join(' ', parts) + ' 2>/dev/null');
 
 	if (!proc)
 		return '';
@@ -56,6 +96,19 @@ function run(cmd) {
 	proc.close();
 
 	return out;
+}
+
+/*
+ * `timeout` is not part of every ImmortalWrt image (busybox may omit the
+ * applet), so only wrap the command when the binary is actually available.
+ */
+const has_timeout = !!(fs.stat('/usr/bin/timeout') || fs.stat('/bin/timeout') ||
+	fs.stat('/sbin/timeout') || fs.stat('/usr/sbin/timeout'));
+
+function run_version(bin) {
+	return has_timeout
+		? run([ 'timeout', '10', bin, '--version' ])
+		: run([ bin, '--version' ]);
 }
 
 function first_line(s) {
@@ -162,7 +215,7 @@ for (let n = 0; n < length(ids); n++) {
 		binary_exists = true;
 		binary_size = binary_stat.size || 0;
 
-		const raw = run([ 'timeout', '10', binary, '--version' ]);
+		const raw = run_version(binary);
 
 		installed_raw = trim(first_line(raw));
 

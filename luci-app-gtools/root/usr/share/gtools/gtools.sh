@@ -131,13 +131,23 @@ tsv_get() {
 	awk -F '\t' -v key="$2" 'index($0, key "\t") == 1 { print substr($0, length(key) + 2); exit }' "$1" 2>/dev/null
 }
 
+run_version() {
+	local _bin=$1
+
+	if command -v timeout >/dev/null 2>&1; then
+		timeout 10 "$_bin" --version 2>/dev/null | head -n1
+	else
+		"$_bin" --version 2>/dev/null | head -n1
+	fi
+}
+
 installed_version() {
 	local _bin=$1
 	local _raw
 
 	[ -x "$_bin" ] || return 0
 
-	_raw=$(timeout 10 "$_bin" --version 2>/dev/null | head -n1)
+	_raw=$(run_version "$_bin")
 	[ -n "$_raw" ] || return 0
 
 	printf '%s' "$_raw" | awk '{ print $NF }' | sed 's/^v//'
@@ -571,7 +581,7 @@ do_upgrade() {
 
 	chmod 0755 "$_new"
 
-	_new_raw=$(timeout 10 "$_new" --version 2>/dev/null | head -n1)
+	_new_raw=$(run_version "$_new")
 
 	if [ -z "$_new_raw" ]; then
 		log "[$_core] 新核心无法执行 --version"
