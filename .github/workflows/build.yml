@@ -1,0 +1,90 @@
+name: Build luci-app-gtools
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      immortalwrt_version:
+        description: ImmortalWrt release to build against
+        required: false
+        default: '25.12.1'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IWRT_VERSION: ${{ github.event.inputs.immortalwrt_version || '25.12.1' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zstd rsync
+
+      - name: Download ImmortalWrt SDK
+        run: |
+          set -euo pipefail
+          base="https://downloads.immortalwrt.org/releases/${IWRT_VERSION}/targets/x86/64"
+          file=$(curl -fsSL "$base/" |
+                 grep -oE 'href="[^"]*sdk[^"]*Linux-x86_64\.tar\.zst"' |
+                 head -n1 | cut -d'"' -f2)
+          test -n "$file"
+          echo "Using SDK: $file"
+          curl -fsSL -o sdk.tar.zst "$base/$file"
+          mkdir sdk
+          tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
+
+      - name: Prepare feeds
+        run: |
+          set -euo pipefail
+          cd sdk
+          ./scripts/feeds update -a
+          ./scripts/feeds install luci-base
+
+      - name: Copy package
+        run: |
+          cp -a luci-app-gtools sdk/package/luci-app-gtools
+
+      - name: Build package
+        run: |
+          set -euo pipefail
+          cd sdk
+          make defconfig
+          version="1.0.0"
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            version=$(printf '%s' "${GITHUB_REF_NAME#v}" | tr '-' '_')
+            [ -n "$version" ] || version="1.0.0"
+          fi
+          make package/luci-app-gtools/compile V=s -j"$(nproc)" \
+            PKG_VERSION="$version" PKG_RELEASE=1
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find sdk/bin/packages -type f -name '*gtools*.apk' -exec cp -v {} dist/ \;
+          test -n "$(ls -A dist)"
+          ls -l dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-app-gtools-apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          generate_release_notes: true

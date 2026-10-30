@@ -1,0 +1,14 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Ensure every core in cores.json has a UCI section so the LuCI form can
+# store per-core settings without creating untyped sections.
+
+[ -f /etc/config/gtools ] || touch /etc/config/gtools
+
+for core in $(ucode -e 'let fs=require("fs"); let c=json(fs.readfile("/usr/share/gtools/cores.json")) || {}; let k=keys(c); for (let i=0;i<length(k);i++) print(k[i], "\n");' 2>/dev/null); do
+	uci -q get "gtools.$core" >/dev/null 2>&1 || uci set "gtools.$core=core"
+done
+
+uci -q commit gtools
+
+exit 0

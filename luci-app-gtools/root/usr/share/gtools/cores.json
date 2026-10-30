@@ -1,0 +1,40 @@
+{
+  "honk": {
+    "title": "honk",
+    "description": "eBPF transparent proxy engine (honk-core)",
+    "repo": "daeuniverse/honk",
+    "binary": "/usr/bin/honk-core",
+    "service": "honk",
+    "service_config": "honk",
+    "service_section": "config",
+    "service_enabled": "enabled",
+    "channels": ["auto", "stable", "beta", "debug"],
+    "defaults": {
+      "enabled": true,
+      "channel": "auto",
+      "variant": "full",
+      "allocator": "mimalloc"
+    },
+    "asset": {
+      "archive": "tar.gz",
+      "binary_name": "honk-core",
+      "pattern": "honk-core-{tag}-{arch}-unknown-linux-{libc}{alloc}{variant}.tar.gz",
+      "debug_pattern": "honk-core-debug-{arch}-unknown-linux-{libc}{alloc}{variant}.tar.gz",
+      "debug_prefix": "debug.",
+      "libc": "musl",
+      "arch": {
+        "x86_64": "x86_64",
+        "aarch64": "aarch64"
+      },
+      "variants": {
+        "full": ["-full", ""],
+        "clash-api": ["-clash-api"],
+        "native-api": ["-native-api"]
+      },
+      "allocators": {
+        "mimalloc": [""],
+        "stock": ["-stock"]
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+# build outputs
+sdk/
+dist/
+*.apk
+*.ipk
+*.tar.zst

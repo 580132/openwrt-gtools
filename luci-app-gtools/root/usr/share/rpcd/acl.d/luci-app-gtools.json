@@ -1,0 +1,19 @@
+{
+	"luci-app-gtools": {
+		"description": "Grant access to the GTools core updater",
+		"read": {
+			"file": {
+				"/usr/share/gtools/*": [ "read" ],
+				"/tmp/gtools/*": [ "read" ]
+			},
+			"uci": [ "gtools" ]
+		},
+		"write": {
+			"file": {
+				"/usr/share/gtools/*": [ "exec" ],
+				"/tmp/gtools/*": [ "write" ]
+			},
+			"uci": [ "gtools" ]
+		}
+	}
+}
