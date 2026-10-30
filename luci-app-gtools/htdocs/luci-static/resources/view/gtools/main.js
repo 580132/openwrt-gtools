@@ -125,6 +125,9 @@ return view.extend({
 		this.autoCheckDone = false;
 		this.form = { cores: {} };
 
+		/* Let the shared page action bar reach the current view instance. */
+		window._gtoolsView = this;
+
 		var root = E('div', { 'class': 'cbi-map' }, [
 			E('style', { 'type': 'text/css' }, [ css ]),
 			E('h2', _('GTools 核心更新')),
@@ -594,7 +597,6 @@ return view.extend({
 	},
 
 	bindPageActions: function() {
-		var self = this;
 		var tries = 0;
 
 		var attach = function() {
@@ -625,10 +627,16 @@ return view.extend({
 				ev.preventDefault();
 				ev.stopPropagation();
 
-				if (ev.target.closest && ev.target.closest('.cbi-button-reset'))
+				if (ev.target.closest && ev.target.closest('.cbi-button-reset')) {
 					window.location.reload();
-				else
-					self.saveSettings();
+					return;
+				}
+
+				/* Always target the view instance that is currently rendered. */
+				var view = window._gtoolsView;
+
+				if (view)
+					view.saveSettings();
 			}, true);
 		};
 
