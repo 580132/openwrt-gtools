@@ -104,4 +104,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.apk
-          generate_release_notes: true
+          generate_release_notes: false
+          body: |
+            GTools for ImmortalWrt 25.12.
+
+            - LuCI app: Services → GTools
+            - Updates the honk core from upstream GitHub releases
+            - SHA256 verification, backups, rollback and auto-rollback
+            - Modular core registry for adding other cores later
+
+            Install:
+
+            ```sh
+            apk add --allow-untrusted luci-app-gtools-*.apk
+            ```
+
+            See the README for configuration and extension instructions.
