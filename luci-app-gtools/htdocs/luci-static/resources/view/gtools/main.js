@@ -336,6 +336,7 @@ return view.extend({
 		var autoCheck = E('input', { 'type': 'checkbox' });
 		autoCheck.checked = !!settings.auto_check;
 
+		this.hasToken = !!settings.has_token;
 		this.form = {
 			download_proxy: proxy,
 			api_proxy: apiProxy,
@@ -815,10 +816,18 @@ return view.extend({
 			if (res.code != 0)
 				throw new Error((res.stderr || res.stdout || '').trim() || _('无法保存设置'));
 
+			if (payload.main.hasOwnProperty('api_token'))
+				self.hasToken = (payload.main.api_token != '');
+
+			form.api_token.value = '';
+			form.api_token.placeholder = self.hasToken
+				? _('已设置，留空保持不变')
+				: _('可选，用于提高 GitHub API 限额');
+			form.clear_token.checked = false;
+
 			ui.addNotification(null, E('p', _('设置已保存并应用')), 'info');
 
 			self.autoCheckDone = false;
-			self.form.api_token.value = '';
 
 			return self.refresh();
 		}).then(function() {
