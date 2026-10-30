@@ -56,6 +56,8 @@ apk add --allow-untrusted /tmp/luci-app-gtools-*.apk
 在“系统 → 软件包”中上传 `.apk` 安装。若提示 `UNTRUSTED signature`，请在 SSH 中用上面的 `--allow-untrusted` 命令安装。
 
 > 本项目按 ImmortalWrt 25.12（apk 包管理器）构建。24.10 及更早版本使用 opkg，不适用此包。
+>
+> 运行依赖 LuCI 自带的 `ucode`、`ucode-mod-fs`、`ucode-mod-uci`，以及 `uclient-fetch`、`ca-bundle`；ImmortalWrt 25.12 默认已包含这些组件。
 
 ---
 

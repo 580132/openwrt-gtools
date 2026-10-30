@@ -15,7 +15,11 @@ PKG_MAINTAINER:=gtools contributors
 
 LUCI_TITLE:=GTools - update proxy cores from upstream releases
 LUCI_DESCRIPTION:=LuCI app that downloads and installs the latest honk (and future) cores from upstream GitHub releases, with SHA256 verification, backups and rollback.
-LUCI_DEPENDS:=+luci-base +ucode +ucode-mod-fs +ucode-mod-uci +uclient-fetch +ca-bundle
+# Runtime requirements are part of every LuCI 25.12 system:
+# luci-base, ucode, ucode-mod-fs, ucode-mod-uci, uclient-fetch, ca-bundle.
+# Keep DEPENDS empty so the SDK can build this file-only package without
+# pulling the whole LuCI dependency tree (cgi-io/lucihttp/etc.).
+LUCI_DEPENDS:=
 LUCI_PKGARCH:=all
 
 define Package/$(PKG_NAME)/conffiles
