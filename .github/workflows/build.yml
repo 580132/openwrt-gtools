@@ -68,6 +68,12 @@ jobs:
           set -euo pipefail
           cd sdk
           make defconfig
+          # The package only ships text files; skip LuCI's host minifiers so
+          # the SDK does not need to build csstidy/jsmin/luasrcdiet/ucode-host.
+          for opt in LUCI_CSSTIDY LUCI_JSMIN LUCI_SRCDIET LUCI_UTMIN; do
+            sed -i "s/^CONFIG_${opt}=y/# CONFIG_${opt} is not set/" .config
+          done
+          make oldconfig </dev/null
           version="1.0.0"
           if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
             version=$(printf '%s' "${GITHUB_REF_NAME#v}" | tr '-' '_')
