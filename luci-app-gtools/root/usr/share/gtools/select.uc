@@ -127,19 +127,20 @@ if (!allocatorSuffixes)
 	fail('未知分配器: ' + allocator);
 
 const pattern = isDebug(best) ? (asset.debug_pattern || asset.pattern) : asset.pattern;
-const names = [];
+const assetInfo = {};
 
 if (best.assets) {
-	for (let i = 0; i < length(best.assets); i++)
-		push(names, best.assets[i].name || '');
+	for (let i = 0; i < length(best.assets); i++) {
+		const item = best.assets[i] || {};
+		const aname = item.name || '';
+
+		if (length(aname) && !assetInfo[aname])
+			assetInfo[aname] = item;
+	}
 }
 
 function hasAsset(name) {
-	for (let i = 0; i < length(names); i++)
-		if (names[i] == name)
-			return true;
-
-	return false;
+	return !!assetInfo[name];
 }
 
 let assetName = null;
@@ -165,6 +166,12 @@ for (let i = 0; i < length(variantSuffixes) && assetName == null; i++) {
 if (assetName == null)
 	fail('上游发布中没有找到适用于 ' + arch + ' 的 ' + variant + ' 安装包');
 
+let sha256 = '';
+const chosen = assetInfo[assetName] || {};
+
+if (chosen.digest && substr(chosen.digest, 0, 7) == 'sha256:')
+	sha256 = substr(chosen.digest, 7);
+
 const base = 'https://github.com/' + meta.repo + '/releases/download/' + tag + '/';
 const hasSums = hasAsset('SHA256SUMS');
 
@@ -172,6 +179,7 @@ printf('tag\t%s\n', tag);
 printf('version\t%s\n', version);
 printf('asset\t%s\n', assetName);
 printf('url\t%s\n', base + assetName);
+printf('sha256\t%s\n', sha256);
 printf('sums_url\t%s\n', hasSums ? base + 'SHA256SUMS' : '');
 printf('archive\t%s\n', asset.archive || 'tar.gz');
 printf('binary_name\t%s\n', asset.binary_name || '');

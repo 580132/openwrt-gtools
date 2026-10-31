@@ -99,32 +99,56 @@ fetch() {
 	local _url=$1
 	local _out=$2
 	local _auth=${3:-}
+	local _try=1
+	local _rc=1
 
-	if command -v curl >/dev/null 2>&1; then
-		if [ -n "$_auth" ]; then
-			curl -fsSL --connect-timeout 15 --max-time 300 -A gtools/1.0 \
-				-H "Authorization: Bearer $_auth" -o "$_out" "$_url"
+	# GitHub object storage occasionally drops TLS connections; retry a few
+	# times before giving up.
+	while [ "$_try" -le 3 ]; do
+		if command -v curl >/dev/null 2>&1; then
+			if [ -n "$_auth" ]; then
+				curl -fsSL --connect-timeout 15 --max-time 300 -A gtools/1.0 \
+					-H "Authorization: Bearer $_auth" -o "$_out" "$_url"
+			else
+				curl -fsSL --connect-timeout 15 --max-time 300 -A gtools/1.0 \
+					-o "$_out" "$_url"
+			fi
+			_rc=$?
+		elif command -v uclient-fetch >/dev/null 2>&1; then
+			if [ -n "$_auth" ]; then
+				uclient-fetch -q -T 300 -U gtools/1.0 \
+					--header "Authorization: Bearer $_auth" -O "$_out" "$_url"
+			else
+				uclient-fetch -q -T 300 -U gtools/1.0 -O "$_out" "$_url"
+			fi
+			_rc=$?
+		elif command -v wget >/dev/null 2>&1; then
+			if [ -n "$_auth" ]; then
+				wget -q -T 300 -U gtools/1.0 \
+					--header "Authorization: Bearer $_auth" -O "$_out" "$_url"
+			else
+				wget -q -T 300 -U gtools/1.0 -O "$_out" "$_url"
+			fi
+			_rc=$?
 		else
-			curl -fsSL --connect-timeout 15 --max-time 300 -A gtools/1.0 \
-				-o "$_out" "$_url"
+			return 127
 		fi
-	elif command -v uclient-fetch >/dev/null 2>&1; then
-		if [ -n "$_auth" ]; then
-			uclient-fetch -q -T 300 -U gtools/1.0 \
-				--header "Authorization: Bearer $_auth" -O "$_out" "$_url"
-		else
-			uclient-fetch -q -T 300 -U gtools/1.0 -O "$_out" "$_url"
+
+		[ "$_rc" -eq 0 ] && return 0
+
+		# 22 means a HTTP error (404/403/...), retrying will not help.
+		[ "$_rc" -eq 22 ] && break
+
+		rm -f "$_out"
+		_try=$((_try + 1))
+
+		if [ "$_try" -le 3 ]; then
+			log "  下载失败（code $_rc），重试 ..."
+			sleep 2
 		fi
-	elif command -v wget >/dev/null 2>&1; then
-		if [ -n "$_auth" ]; then
-			wget -q -T 300 -U gtools/1.0 \
-				--header "Authorization: Bearer $_auth" -O "$_out" "$_url"
-		else
-			wget -q -T 300 -U gtools/1.0 -O "$_out" "$_url"
-		fi
-	else
-		return 127
-	fi
+	done
+
+	return 1
 }
 
 tsv_get() {
@@ -141,8 +165,25 @@ run_version() {
 	fi
 }
 
+parse_version() {
+	local _raw=$1
+	local _core=${2:-}
+	local _field=""
+
+	if [ -n "$_core" ]; then
+		_field=$(core_meta "$_core" version_field)
+	fi
+
+	if [ -n "$_field" ]; then
+		printf '%s' "$_raw" | awk -v f="$_field" '{ print $f }' | sed 's/^v//'
+	else
+		printf '%s' "$_raw" | awk '{ print $NF }' | sed 's/^v//'
+	fi
+}
+
 installed_version() {
 	local _bin=$1
+	local _core=${2:-}
 	local _raw
 
 	[ -x "$_bin" ] || return 0
@@ -150,7 +191,7 @@ installed_version() {
 	_raw=$(run_version "$_bin")
 	[ -n "$_raw" ] || return 0
 
-	printf '%s' "$_raw" | awk '{ print $NF }' | sed 's/^v//'
+	parse_version "$_raw" "$_core"
 }
 
 job_running() {
@@ -294,7 +335,7 @@ backup_current() {
 	local _safe_ver
 
 	_bin_name=$(basename "$_bin")
-	_old_ver=$(installed_version "$_bin")
+	_old_ver=$(installed_version "$_bin" "$_core")
 	_safe_ver=$(printf '%s' "${_old_ver:-unknown}" | tr '/@ ' '___')
 
 	[ -f "$_bin" ] || return 0
@@ -504,6 +545,7 @@ do_upgrade() {
 	local _asset
 	local _version
 	local _sums
+	local _sha256
 	local _archive
 	local _bin_name
 	local _bin
@@ -557,6 +599,7 @@ do_upgrade() {
 	_asset=$(tsv_get "$_out" asset)
 	_version=$(tsv_get "$_out" version)
 	_sums=$(tsv_get "$_out" sums_url)
+	_sha256=$(tsv_get "$_out" sha256)
 	_archive=$(tsv_get "$_out" archive)
 	_bin_name=$(tsv_get "$_out" binary_name)
 	_bin=$(tsv_get "$_out" binary)
@@ -586,7 +629,20 @@ do_upgrade() {
 	_verify=$(uci_get main.verify_sha256)
 
 	if [ "$_verify" != "0" ]; then
-		if [ -n "$_sums" ]; then
+		if [ -n "$_sha256" ]; then
+			log "[$_core] 校验 SHA256（GitHub digest）..."
+
+			_actual=$(sha256sum "$_tmp/$_asset" 2>/dev/null | awk '{ print $1 }')
+
+			if [ -z "$_actual" ] || [ "$_actual" != "$_sha256" ]; then
+				log "[$_core] SHA256 校验失败"
+				rm -rf "$_tmp"
+				finish_job 1 "SHA256 校验失败"
+				return
+			fi
+
+			log "[$_core] SHA256 校验通过"
+		elif [ -n "$_sums" ]; then
 			log "[$_core] 校验 SHA256 ..."
 
 			if ! fetch "$(download_url "$_sums")" "$_tmp/SHA256SUMS"; then
@@ -613,7 +669,7 @@ do_upgrade() {
 
 			log "[$_core] SHA256 校验通过"
 		else
-			log "[$_core] 该版本未提供 SHA256SUMS，跳过校验"
+			log "[$_core] 该版本未提供校验值，跳过校验"
 		fi
 	fi
 
@@ -666,8 +722,8 @@ do_upgrade() {
 		return
 	fi
 
-	_new_ver=$(printf '%s' "$_new_raw" | awk '{ print $NF }' | sed 's/^v//')
-	_old_ver=$(installed_version "$_bin")
+	_new_ver=$(parse_version "$_new_raw" "$_core")
+	_old_ver=$(installed_version "$_bin" "$_core")
 
 	log "[$_core] 新核心版本: $_new_raw"
 

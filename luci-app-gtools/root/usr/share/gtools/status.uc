@@ -254,8 +254,11 @@ for (let n = 0; n < length(ids); n++) {
 		installed_raw = trim(first_line(raw));
 
 		const parts = split(trim(installed_raw), ' ');
+		const vfield = +meta.version_field || 0;
 
-		installed = parts[length(parts) - 1] || '';
+		installed = vfield > 0
+			? (parts[vfield - 1] || '')
+			: (parts[length(parts) - 1] || '');
 
 		if (substr(installed, 0, 1) == 'v')
 			installed = substr(installed, 1);

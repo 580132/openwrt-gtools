@@ -36,5 +36,39 @@
         "stock": ["-stock"]
       }
     }
+  },
+  "cloudflared": {
+    "title": "cloudflared",
+    "description": "Cloudflare Tunnel client (cloudflared)",
+    "repo": "cloudflare/cloudflared",
+    "binary": "/usr/bin/cloudflared",
+    "service": "cloudflared",
+    "service_config": "cloudflared",
+    "service_section": "config",
+    "service_enabled": "enabled",
+    "version_field": 3,
+    "channels": ["stable"],
+    "defaults": {
+      "enabled": true,
+      "channel": "stable",
+      "variant": "default",
+      "allocator": "default"
+    },
+    "asset": {
+      "archive": "binary",
+      "binary_name": "cloudflared",
+      "pattern": "cloudflared-linux-{arch}",
+      "libc": "",
+      "arch": {
+        "x86_64": "amd64",
+        "aarch64": "arm64"
+      },
+      "variants": {
+        "default": [""]
+      },
+      "allocators": {
+        "default": [""]
+      }
+    }
   }
 }

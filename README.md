@@ -4,7 +4,7 @@
 
 上游（例如 [daeuniverse/honk](https://github.com/daeuniverse/honk)）发版较快，而固件/软件源里的包往往滞后。GTools 直接从 GitHub Releases 下载最新核心，校验后替换本机文件，并保留旧版本以便回滚。
 
-目前内置 **honk** 核心，代码按“核心注册表”设计，后续可以继续加入 mihomo、sing-box、Xray 等核心。
+目前内置 **honk** 和 **cloudflared** 两个核心，代码按“核心注册表”设计，后续可以继续加入 mihomo、sing-box、Xray 等核心。
 
 > 本项目只替换核心二进制文件，不修改 honk 的配置、内核模块或依赖。升级前请确保设备满足 honk 的运行要求（Linux 6.12+、BTF、bpffs 等）。
 
@@ -17,7 +17,7 @@
 - 支持 honk 的 `full`、`clash-api`、`native-api` 三种变体
 - 支持 `mimalloc` / `stock` 两种内存分配器
 - 更新通道：`auto`、`stable`、`beta`、`debug`
-- 下载后校验上游 `SHA256SUMS`（上游未提供时跳过并提示）
+- 下载后校验上游 `SHA256SUMS`，或使用 GitHub 提供的 asset digest（上游未提供时跳过并提示）
 - 替换前自动备份，默认保留最近 3 份
 - 原子替换核心文件，按需重启服务
 - 升级后服务未能启动时自动回滚
@@ -32,8 +32,11 @@
 | 核心 | 二进制 | 服务 | 架构 | 说明 |
 | --- | --- | --- | --- | --- |
 | honk | `/usr/bin/honk-core` | `/etc/init.d/honk` | `x86_64`、`aarch64` | 使用上游 musl 静态构建 |
+| cloudflared | `/usr/bin/cloudflared` | `/etc/init.d/cloudflared` | `x86_64`、`aarch64` | 直接替换上游静态二进制 |
 
 honk 上游目前只发布 `x86_64` 和 `aarch64` 的 musl/gnu 构建。OpenWrt 使用 musl，因此 GTools 固定选择 musl 包；`armv7`、`mips` 等架构会提示“不支持的架构”。
+
+cloudflared 上游提供 `cloudflared-linux-amd64` / `cloudflared-linux-arm64` 静态二进制，GTools 会下载原始文件并用 GitHub 的 `sha256` digest 校验。cloudflared 只有正式版通道，页面上不会显示通道/变体/分配器选项。
 
 ---
 
@@ -128,7 +131,7 @@ honk 目前只有 beta 版本，因此默认 `auto` 会选中最新的 beta。�
 3. 按更新通道挑选最新 release。
 4. 根据架构、变体、分配器拼出资源名，并与 release 的 assets 列表核对。
 5. 下载资源到 `/tmp/gtools/`。
-6. 下载 `SHA256SUMS` 并校验（若存在）。
+6. 校验 SHA256：优先使用 GitHub 提供的 asset digest，其次使用上游 `SHA256SUMS`（两者都没有时跳过）。
 7. 解压、执行 `--version` 做基本可用性检查。
 8. 备份当前核心到 `/usr/share/gtools/backups/<core>/`。
 9. 写入 `*.gtools.new` 后 `mv` 原子替换。
@@ -198,9 +201,10 @@ GTools 的核心列表在：
 | `binary` | 本机核心路径 |
 | `service` | init 脚本名，对应 `/etc/init.d/<service>` |
 | `service_config` / `service_section` / `service_enabled` | 读取服务是否启用的 UCI 配置 |
+| `version_field` | `--version` 输出中版本号是第几个空格分隔字段（默认取最后一个） |
 | `channels` | 界面中显示的通道 |
 | `defaults` | 新核心的默认设置 |
-| `asset.archive` | `tar.gz`、`gz` 或 `none` |
+| `asset.archive` | `tar.gz`、`gz` 或 `binary`（直接下载的原始二进制） |
 | `asset.binary_name` | 压缩包内二进制文件名 |
 | `asset.pattern` | 资源名模板，支持 `{tag}`、`{version}`、`{arch}`、`{libc}`、`{variant}`、`{alloc}` |
 | `asset.debug_pattern` | debug 通道使用的模板（可选） |

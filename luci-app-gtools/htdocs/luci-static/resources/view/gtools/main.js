@@ -441,18 +441,25 @@ return view.extend({
 			allocator: allocator
 		};
 
+		var rows = [ labelRow(_('启用更新检查'), '', enabled) ];
+
+		/* Cores with a single choice do not need a selector. */
+		if (channels.length > 1)
+			rows.push(labelRow(_('更新通道'),
+				_('auto：最新正式版或测试版；stable：仅正式版；beta：仅测试版；debug：滚动调试版。'),
+				channel));
+
+		if (variants.length > 1)
+			rows.push(labelRow(_('核心变体'),
+				_('full 包含 Clash API、原生 API 和内置面板；其余为精简版。'), variant));
+
+		if (allocators.length > 1)
+			rows.push(labelRow(_('内存分配器'),
+				_('mimalloc 吞吐更好；stock 内存占用更低。'), allocator));
+
 		return E('div', { 'class': 'cbi-section' }, [
 			E('h3', _('%s 设置').format(core.title)),
-			E('div', { 'class': 'cbi-section-node' }, [
-				labelRow(_('启用更新检查'), '', enabled),
-				labelRow(_('更新通道'),
-					_('auto：最新正式版或测试版；stable：仅正式版；beta：仅测试版；debug：滚动调试版。'),
-					channel),
-				labelRow(_('核心变体'),
-					_('full 包含 Clash API、原生 API 和内置面板；其余为精简版。'), variant),
-				labelRow(_('内存分配器'),
-					_('mimalloc 吞吐更好；stock 内存占用更低。'), allocator)
-			])
+			E('div', { 'class': 'cbi-section-node' }, rows)
 		]);
 	},
 
