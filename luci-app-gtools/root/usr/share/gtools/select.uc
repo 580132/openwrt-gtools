@@ -67,8 +67,20 @@ if (channel != 'auto' && channel != 'stable' && channel != 'beta' && channel != 
 const debugPrefix = asset.debug_prefix || 'debug.';
 const wantDebug = (channel == 'debug');
 
+/*
+ * Debug and diagnostic builds use either "debug." or "debug-" prefixes.
+ * Treat both as debug builds so they never win the auto/stable/beta
+ * channels.
+ */
+function tag_is_debug(tag) {
+	if (substr(tag, 0, 6) == 'debug-')
+		return true;
+
+	return substr(tag, 0, length(debugPrefix)) == debugPrefix;
+}
+
 function isDebug(release) {
-	return substr(release.tag_name || '', 0, length(debugPrefix)) == debugPrefix;
+	return tag_is_debug(release.tag_name || '');
 }
 
 let best = null;
@@ -82,11 +94,11 @@ for (let i = 0; i < length(releases); i++) {
 	const tag = release.tag_name || '';
 
 	if (wantDebug) {
-		if (!isDebug(release))
+		if (!tag_is_debug(tag))
 			continue;
 	}
 	else {
-		if (isDebug(release) || tag == 'debug')
+		if (tag_is_debug(tag))
 			continue;
 
 		if (channel == 'stable' && release.prerelease)
